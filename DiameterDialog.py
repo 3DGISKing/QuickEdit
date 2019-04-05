@@ -71,7 +71,7 @@ class DiameterDialog(QtWidgets.QDialog):
     def onPushButtonConfirmClicked(self):
         diameter = int(self.str_diameter)
 
-        if diameter < 10 or diameter > 99:
+        if diameter < 10 or diameter > 999:
             QMessageBox.critical(self, 'Error', 'Invalid diameter')
             return
 
@@ -134,6 +134,11 @@ class DiameterDialog(QtWidgets.QDialog):
         if self.str_diameter == '0':
             self.str_diameter = number
         else:
+            length = len(self.str_diameter)
+
+            if length >= 3:
+                return
+
             self.str_diameter = self.str_diameter + number
 
         self.set_diameter_label()

@@ -6,8 +6,8 @@
  tool for quick editing attributes in field campaigns
                              -------------------
         begin                : 2019-02-19
-        copyright            : (C) 2019 by haris
-        email                :
+        copyright            : (C) 2019 by Jingli Wu
+        email                : wugis1219@gmail.com
         git sha              : $Format:%H$
  ***************************************************************************/
 
@@ -23,19 +23,22 @@
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QPixmap, QCursor
-from qgis.core import QgsVectorLayer, QgsFeature
+from qgis.core import QgsVectorLayer, QgsFeature, QgsPointXY
 from qgis.gui import QgsMapToolIdentify
 
-class IdentifyGeometry(QgsMapToolIdentify):
+class QuickEditMapTool(QgsMapToolIdentify):
     # signal definition
-    geomIdentified = pyqtSignal(QgsVectorLayer, QgsFeature)
+
+    identified = pyqtSignal(QgsVectorLayer, QgsFeature)
+    clicked = pyqtSignal(QgsPointXY)
 
     def __init__(self, canvas, layerType = 'AllLayers'):
-        self.layerType = getattr(QgsMapToolIdentify,layerType)
+        self.layerType = getattr(QgsMapToolIdentify, layerType)
         self.canvas = canvas
         QgsMapToolIdentify.__init__(self, canvas)
         self.setCursor(QCursor())
 
+    # noinspection PyPep8Naming
     def canvasReleaseEvent(self, mouseEvent):
         try:
             results = self.identify(mouseEvent.x(), mouseEvent.y(), self.LayerSelection,self.layerType)
@@ -45,4 +48,6 @@ class IdentifyGeometry(QgsMapToolIdentify):
 
         if len(results) > 0:
             print (results[0].mFeature.attributes())
-            self.geomIdentified.emit(results[0].mLayer, QgsFeature(results[0].mFeature))
+            self.identified.emit(results[0].mLayer, QgsFeature(results[0].mFeature))
+        else:
+            self.clicked.emit(mouseEvent.originalMapPoint())

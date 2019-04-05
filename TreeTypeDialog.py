@@ -6,8 +6,8 @@
  tool for quick editing attributes in field campaigns
                              -------------------
         begin                : 2019-02-19
-        copyright            : (C) 2019 by haris
-        email                :
+        copyright            : (C) 2019 by Jingli Wu
+        email                : wugis1219@gmail.com
         git sha              : $Format:%H$
  ***************************************************************************/
 

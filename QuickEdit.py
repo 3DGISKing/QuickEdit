@@ -23,10 +23,12 @@
 
 import os
 from PyQt5 import QtGui, QtWidgets
+from PyQt5.QtWidgets import QMessageBox
 from qgis.PyQt.QtCore import QSettings, QLocale, QTranslator, QCoreApplication, Qt
 from qgis.core import *
-from .IdentifyGeometry import IdentifyGeometry
-from .TreeTypeDialog import TreeTypeDialog
+from qgis.gui import *
+from .QuickEditMapTool import QuickEditMapTool
+from .TreeTypeDialogEx import TreeTypeDialogEx
 from .DiameterDialog import DiameterDialog
 
 
@@ -72,34 +74,78 @@ class QuickEdit:
         # initialize plugin directory
         self.plugin_dir = os.path.dirname(__file__)
 
-        icon_path = os.path.join(self.plugin_dir, "icons", "quickEdit.png")
-        self.mapToolAction = QtWidgets.QAction(QtGui.QIcon(icon_path),"Quick Editing Attribute", self.iface.mainWindow())
-        self.mapToolAction.setCheckable(True)
-        self.mapToolAction.triggered.connect(self.setMapTool)
+        icon_path = os.path.join(self.plugin_dir, "icons", "quickEdit_edit.png")
+        self.mapToolActionEdit = QtWidgets.QAction(QtGui.QIcon(icon_path),"Edit Tree", self.iface.mainWindow())
+        self.mapToolActionEdit.setCheckable(True)
+        self.mapToolActionEdit.triggered.connect(self.onEditActionTriggered)
 
-        self.mapTool = IdentifyGeometry(self.mapCanvas)
+        icon_path = os.path.join(self.plugin_dir, "icons", "quickEdit_new.png")
+        self.mapToolActionNew = QtWidgets.QAction(QtGui.QIcon(icon_path),"New Tree", self.iface.mainWindow())
+        self.mapToolActionNew.setCheckable(True)
+        self.mapToolActionNew.triggered.connect(self.onNewActionTriggered)
 
-        self.mapTool.geomIdentified.connect(self.onGeometryIdentified)
-        self.mapTool.setAction(self.mapToolAction)
+        icon_path = os.path.join(self.plugin_dir, "icons", "quickEdit_delete.png")
+        self.mapToolActionDelete = QtWidgets.QAction(QtGui.QIcon(icon_path),"Delete Tree", self.iface.mainWindow())
+        self.mapToolActionDelete.setCheckable(True)
+        self.mapToolActionDelete.triggered.connect(self.onDeleteActionTriggered)
+
+        self.actionGroup =  QtWidgets.QActionGroup(self.iface.mainWindow())
+
+        self.actionGroup.addAction(self.mapToolActionEdit)
+        self.actionGroup.addAction(self.mapToolActionNew)
+        self.actionGroup.addAction(self.mapToolActionDelete)
+
+        self.actionGroup.setExclusive(True)
+
+        self.mapTool = QuickEditMapTool(self.mapCanvas)
+
+        self.mapTool.clicked.connect(self.onCanvasClicked)
+        self.mapTool.identified.connect(self.onIdentified)
+
+        self.mapTool.setAction(self.mapToolActionEdit)
+
+        self.mapCanvas.setMapTool(self.mapTool)
 
     def tr(self, message):
         return QCoreApplication.translate(self.__class__.__name__, message)
 
     # noinspection PyPep8Naming
     def initGui(self):
-        self.iface.addToolBarIcon(self.mapToolAction)
-        self.iface.addPluginToMenu("&Quick Editing Attribute", self.mapToolAction)
+        self.iface.addToolBarIcon(self.mapToolActionEdit)
+        self.iface.addToolBarIcon(self.mapToolActionNew)
+        self.iface.addToolBarIcon(self.mapToolActionDelete)
+
+        self.iface.addPluginToMenu("&Quick Edit", self.mapToolActionEdit)
+        self.iface.addPluginToMenu("&Quick Edit", self.mapToolActionNew)
+        self.iface.addPluginToMenu("&Quick Edit", self.mapToolActionDelete)
 
     def unload(self):
-        self.iface.removePluginMenu("&Quick Editing Attribute", self.mapToolAction)
-        self.iface.removeToolBarIcon(self.mapToolAction)
+        self.iface.removePluginMenu("&Quick Edit", self.mapToolActionEdit)
+        self.iface.removeToolBarIcon(self.mapToolActionEdit)
+
+        self.iface.removePluginMenu("&Quick Edit", self.mapToolActionNew)
+        self.iface.removeToolBarIcon(self.mapToolActionNew)
+
+        self.iface.removePluginMenu("&Quick Edit", self.mapToolActionDelete)
+        self.iface.removeToolBarIcon(self.mapToolActionDelete)
 
     # noinspection PyPep8Naming
-    def setMapTool(self):
+    def onEditActionTriggered(self):
+        self.mapTool.setAction(self.mapToolActionEdit)
+        self.mapCanvas.setMapTool(self.mapTool)
+
+    # noinspection PyPep8Naming
+    def onNewActionTriggered(self):
+        self.mapTool.setAction(self.mapToolActionNew)
+        self.mapCanvas.setMapTool(self.mapTool)
+
+    # noinspection PyPep8Naming
+    def onDeleteActionTriggered(self):
+        self.mapTool.setAction(self.mapToolActionDelete)
         self.mapCanvas.setMapTool(self.mapTool)
 
     def show_tree_type_dialog(self, selected_layer, selected_feature):
-        tree_type_dialog = TreeTypeDialog()
+        tree_type_dialog = TreeTypeDialogEx()
 
         tree_type_dialog.selectedLayer = selected_layer
         tree_type_dialog.selectedFeature = selected_feature
@@ -109,7 +155,10 @@ class QuickEdit:
         tree_type_dialog.exec_()
 
     # noinspection PyPep8Naming
-    def onGeometryIdentified(self, selectedLayer, selectedFeature):
+    def doEditLogic(self, selectedLayer, selectedFeature):
+        if selectedLayer is None:
+            return
+
         if selectedLayer.geometryType() not in [self.Point]:
             self.iface.messageBar().pushCritical(self.tr('Error'), self.tr('Selected layer is not Tree layer! Geometry type is not point.'))
             return
@@ -135,6 +184,77 @@ class QuickEdit:
         self.show_tree_type_dialog(selectedLayer, selectedFeature)
 
     # noinspection PyPep8Naming
+    def doNewLogic(self, mapPoint):
+        layer = self.mapCanvas.currentLayer()
+
+        if not self.checkTreeLayer(layer):
+            return
+
+        if not layer.isEditable():
+            self.showCriticalMessageBox("The current layer is not editable!")
+            return
+
+        feature = QgsFeature()
+
+        feature.setGeometry(QgsGeometry.fromPointXY(mapPoint))
+
+        # dlg = QgsAttributeDialog(layer, feature, False)
+        #
+        # ret = dlg.show()
+        #
+        # if not ret:
+        #     return False
+        #
+
+        # why crash
+        # https://gis.stackexchange.com/questions/168448/why-does-openfeatureform-crash-qgis
+        # https://lists.osgeo.org/pipermail//qgis-developer/2015-November/040376.html
+        # https://lists.osgeo.org/pipermail/qgis-developer/2014-August/034225.html
+
+        ret = self.iface.openFeatureForm (layer, feature)
+
+        if not ret:
+            return
+
+        layer.dataProvider().addFeature(feature)
+        layer.updateExtents()
+        self.iface.mapCanvas().refreshAllLayers()
+
+    # noinspection PyPep8Naming
+    def doDeleteLogic(self, selectedLayer, selectedFeature):
+        if selectedLayer is None:
+            return
+
+        if not self.checkTreeLayer(selectedLayer):
+            return
+
+        reply = QMessageBox.question(self.iface.mainWindow(), "QuickEdit", "Are you sure you want to delete?", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+
+        if reply != QMessageBox.Yes:
+            return
+
+        selectedLayer.dataProvider().deleteFeatures([selectedFeature.id()])
+        self.iface.mapCanvas().refreshAllLayers()
+
+    # noinspection PyPep8Naming
+    def onCanvasClicked(self, mapPoint):
+        activeMapToolAction = self.mapTool.action()
+
+        if activeMapToolAction == self.mapToolActionNew:
+            self.doNewLogic(mapPoint)
+
+    # noinspection PyPep8Naming
+    def onIdentified(self, selectedLayer, selectedFeature):
+        activeMapToolAction = self.mapTool.action()
+
+        if activeMapToolAction == self.mapToolActionEdit:
+            self.doEditLogic(selectedLayer, selectedFeature)
+
+        if activeMapToolAction == self.mapToolActionDelete:
+            self.doDeleteLogic(selectedLayer, selectedFeature)
+
+
+    # noinspection PyPep8Naming
     def onTreeTypeDialogConfirmed(self, selectedLayer, selectedFeature):
         diameterDialog = DiameterDialog()
 
@@ -149,6 +269,31 @@ class QuickEdit:
     def onDiameterDialogBacked(self, selectedLayer, selectedFeature):
         self.show_tree_type_dialog(selectedLayer, selectedFeature)
 
+    # noinspection PyPep8Naming
+    def checkTreeLayer(self, layer):
+        if layer is None:
+            infoString = QCoreApplication.translate('Error', "No current Layer!")
+            self.showCriticalMessageBox(infoString)
+            return False
+
+        if layer.type() != QgsMapLayer.VectorLayer:
+            infoString = QCoreApplication.translate('Error', "The current layer is not a vector layer!")
+            self.showCriticalMessageBox(infoString)
+            return False
+
+        geomType = layer.geometryType()
+
+        if geomType is not None:
+            if geomType not in [self.Point]:
+                infoString = QCoreApplication.translate('Error', "The current layer is point layer!")
+                self.showCriticalMessageBox(infoString)
+                return False
+
+        return True
+
+    # noinspection PyPep8Naming
+    def showCriticalMessageBox(self, infoString):
+        QMessageBox.critical(self.iface.mainWindow(), "Error", infoString, QMessageBox.Ok)
 
 if __name__ == '__main__':
     pass
