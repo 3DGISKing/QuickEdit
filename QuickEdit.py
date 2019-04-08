@@ -24,13 +24,13 @@
 import os
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtWidgets import QMessageBox
-from qgis.PyQt.QtCore import QSettings, QLocale, QTranslator, QCoreApplication, Qt
+from qgis.PyQt.QtCore import QSettings, QLocale, QTranslator, QCoreApplication, Qt, QVariant
 from qgis.core import *
 from qgis.gui import *
 from .QuickEditMapTool import QuickEditMapTool
 from .TreeTypeDialogEx import TreeTypeDialogEx
 from .DiameterDialog import DiameterDialog
-
+from .TreeAttributeDialog import TreeAttributeDialog
 
 class QuickEdit:
     def __init__(self, iface):
@@ -106,6 +106,8 @@ class QuickEdit:
 
         self.mapCanvas.setMapTool(self.mapTool)
 
+        self.treeAttributeDialog = None
+
     def tr(self, message):
         return QCoreApplication.translate(self.__class__.__name__, message)
 
@@ -159,26 +161,7 @@ class QuickEdit:
         if selectedLayer is None:
             return
 
-        if selectedLayer.geometryType() not in [self.Point]:
-            self.iface.messageBar().pushCritical(self.tr('Error'), self.tr('Selected layer is not Tree layer! Geometry type is not point.'))
-            return
-
-        tree_type_field_id = selectedLayer.fields().indexFromName('tree_type')
-
-        if tree_type_field_id == -1:
-            self.iface.messageBar().pushCritical(self.tr('Error'), self.tr('Selected layer is not Tree layer! Can not find "tree_type" attribute.'))
-            return
-
-        diameter_field_id = selectedLayer.fields().indexFromName('diameter')
-
-        if diameter_field_id == -1:
-            self.iface.messageBar().pushCritical(self.tr('Error'), self.tr('Selected layer is not Tree layer! Can not find "diameter" attribute.'))
-            return
-
-        status_field_id = selectedLayer.fields().indexFromName('status')
-
-        if status_field_id == -1:
-            self.iface.messageBar().pushCritical(self.tr('Error'), self.tr('Selected layer is not Tree layer! Can not find "status" attribute.'))
+        if not self.checkTreeLayer(selectedLayer):
             return
 
         self.show_tree_type_dialog(selectedLayer, selectedFeature)
@@ -190,9 +173,9 @@ class QuickEdit:
         if not self.checkTreeLayer(layer):
             return
 
-        if not layer.isEditable():
-            self.showCriticalMessageBox("The current layer is not editable!")
-            return
+        # if not layer.isEditable():
+        #     self.showCriticalMessageBox("The current layer is not editable!")
+        #     return
 
         feature = QgsFeature()
 
@@ -204,21 +187,37 @@ class QuickEdit:
         #
         # if not ret:
         #     return False
-        #
 
         # why crash
         # https://gis.stackexchange.com/questions/168448/why-does-openfeatureform-crash-qgis
         # https://lists.osgeo.org/pipermail//qgis-developer/2015-November/040376.html
         # https://lists.osgeo.org/pipermail/qgis-developer/2014-August/034225.html
 
-        ret = self.iface.openFeatureForm (layer, feature)
+        # ret = self.iface.openFeatureForm (layer, feature)
+        #
+        # if not ret:
+        #     return
 
-        if not ret:
+        if self.treeAttributeDialog is None:
+            self.treeAttributeDialog = TreeAttributeDialog()
+
+        result = self.treeAttributeDialog.exec_()
+
+        if not result:
             return
+
+        fields = layer.fields()
+
+        feature.setFields(fields)
+
+        feature['tree_type'] = self.treeAttributeDialog.line_edit_tree_type.text()
+        feature['diameter'] = int(self.treeAttributeDialog.line_edit_tree_diameter.text())
+        feature['status'] = 'orange'
 
         layer.dataProvider().addFeature(feature)
         layer.updateExtents()
         self.iface.mapCanvas().refreshAllLayers()
+
 
     # noinspection PyPep8Naming
     def doDeleteLogic(self, selectedLayer, selectedFeature):
@@ -272,12 +271,17 @@ class QuickEdit:
     # noinspection PyPep8Naming
     def checkTreeLayer(self, layer):
         if layer is None:
-            infoString = QCoreApplication.translate('Error', "No current Layer!")
+            infoString = QCoreApplication.translate('Error', "No Selected Layer!")
+            self.showCriticalMessageBox(infoString)
+            return False
+
+        if layer.name() != "tree":
+            infoString = QCoreApplication.translate('Error', self.tr('All tools shall only query a shape layer with the named "tree"!'))
             self.showCriticalMessageBox(infoString)
             return False
 
         if layer.type() != QgsMapLayer.VectorLayer:
-            infoString = QCoreApplication.translate('Error', "The current layer is not a vector layer!")
+            infoString = QCoreApplication.translate('Error', "Selected layer is not a vector layer!")
             self.showCriticalMessageBox(infoString)
             return False
 
@@ -285,9 +289,23 @@ class QuickEdit:
 
         if geomType is not None:
             if geomType not in [self.Point]:
-                infoString = QCoreApplication.translate('Error', "The current layer is point layer!")
+                infoString = QCoreApplication.translate('Error', "Selected layer is point layer!")
                 self.showCriticalMessageBox(infoString)
                 return False
+
+        if layer.dataProvider().fieldNameIndex("tree_type") == -1:
+            infoString = QCoreApplication.translate('Error', self.tr('Selected layer is not Tree layer! Can not find "tree_type" attribute.'))
+            self.showCriticalMessageBox(infoString)
+            return False
+
+        if layer.dataProvider().fieldNameIndex("diameter") == -1:
+            infoString = QCoreApplication.translate('Error', self.tr('Selected layer is not Tree layer! Can not find "diameter" attribute.'))
+            self.showCriticalMessageBox(infoString)
+            return False
+
+        if layer.dataProvider().fieldNameIndex("status") == -1:
+            self.iface.messageBar().pushCritical(self.tr('Error'), self.tr('Selected layer is not Tree layer! Can not find "status" attribute.'))
+            return
 
         return True
 

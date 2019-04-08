@@ -41,13 +41,14 @@ class QuickEditMapTool(QgsMapToolIdentify):
     # noinspection PyPep8Naming
     def canvasReleaseEvent(self, mouseEvent):
         try:
-            results = self.identify(mouseEvent.x(), mouseEvent.y(), self.LayerSelection,self.layerType)
+            results = self.identify(mouseEvent.x(), mouseEvent.y(), self.LayerSelection, self.VectorLayer)
         except Exception as e:
             print ("Identify  EXCEPTION: ", e)
             results = []
 
+
         if len(results) > 0:
-            print (results[0].mFeature.attributes())
-            self.identified.emit(results[0].mLayer, QgsFeature(results[0].mFeature))
+            layer = results[0].mLayer
+            self.identified.emit(layer, QgsFeature(results[0].mFeature))
         else:
             self.clicked.emit(mouseEvent.originalMapPoint())
