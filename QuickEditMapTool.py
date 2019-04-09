@@ -23,7 +23,7 @@
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QPixmap, QCursor
-from qgis.core import QgsVectorLayer, QgsFeature, QgsPointXY
+from qgis.core import QgsVectorLayer, QgsFeature, QgsPointXY,QgsProject
 from qgis.gui import QgsMapToolIdentify
 
 class QuickEditMapTool(QgsMapToolIdentify):
@@ -40,12 +40,13 @@ class QuickEditMapTool(QgsMapToolIdentify):
 
     # noinspection PyPep8Naming
     def canvasReleaseEvent(self, mouseEvent):
+        layers = QgsProject.instance().mapLayersByName('tree')
+
         try:
-            results = self.identify(mouseEvent.x(), mouseEvent.y(), self.LayerSelection, self.VectorLayer)
+            results = self.identify(mouseEvent.x(), mouseEvent.y(), layers)
         except Exception as e:
             print ("Identify  EXCEPTION: ", e)
             results = []
-
 
         if len(results) > 0:
             layer = results[0].mLayer

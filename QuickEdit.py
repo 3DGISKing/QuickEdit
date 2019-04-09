@@ -151,6 +151,7 @@ class QuickEdit:
 
         tree_type_dialog.selectedLayer = selected_layer
         tree_type_dialog.selectedFeature = selected_feature
+        tree_type_dialog.isNew = self.mapTool.action() == self.mapToolActionNew
 
         tree_type_dialog.confirm.connect(self.onTreeTypeDialogConfirmed)
 
@@ -198,25 +199,20 @@ class QuickEdit:
         # if not ret:
         #     return
 
-        if self.treeAttributeDialog is None:
-            self.treeAttributeDialog = TreeAttributeDialog()
-
-        result = self.treeAttributeDialog.exec_()
-
-        if not result:
-            return
-
         fields = layer.fields()
 
         feature.setFields(fields)
 
-        feature['tree_type'] = self.treeAttributeDialog.line_edit_tree_type.text()
-        feature['diameter'] = int(self.treeAttributeDialog.line_edit_tree_diameter.text())
-        feature['status'] = 'orange'
+        self.show_tree_type_dialog(layer, feature)
 
-        layer.dataProvider().addFeature(feature)
-        layer.updateExtents()
-        self.iface.mapCanvas().refreshAllLayers()
+        #
+        # feature['tree_type'] = self.treeAttributeDialog.line_edit_tree_type.text()
+        # feature['diameter'] = int(self.treeAttributeDialog.line_edit_tree_diameter.text())
+        # feature['status'] = 'orange'
+        #
+        # layer.dataProvider().addFeature(feature)
+        # layer.updateExtents()
+        # self.iface.mapCanvas().refreshAllLayers()
 
 
     # noinspection PyPep8Naming
@@ -259,6 +255,8 @@ class QuickEdit:
 
         diameterDialog.selectedLayer = selectedLayer
         diameterDialog.selectedFeature = selectedFeature
+        diameterDialog.isNew = self.mapTool.action() == self.mapToolActionNew
+        diameterDialog.mapCanvas = self.iface.mapCanvas()
 
         diameterDialog.back.connect(self.onDiameterDialogBacked)
 

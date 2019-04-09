@@ -55,6 +55,7 @@ class DiameterDialog(QtWidgets.QDialog):
 
         self.selectedLayer = None
         self.selectedFeature = None
+        self.isNew = None
 
         self.str_diameter = '0'
         self.set_diameter_label()
@@ -76,7 +77,17 @@ class DiameterDialog(QtWidgets.QDialog):
             return
 
         self.set_diameter(diameter)
-        self.set_status('green')
+
+        if self.isNew:
+            self.set_status('orange')
+        else:
+            self.set_status('green')
+
+        if self.isNew:
+             self.selectedLayer.dataProvider().addFeature(self.selectedFeature)
+             self.selectedLayer.updateExtents()
+             self.mapCanvas.refreshAllLayers()
+
         self.accept()
 
     # noinspection PyPep8Naming
@@ -144,19 +155,25 @@ class DiameterDialog(QtWidgets.QDialog):
         self.set_diameter_label()
 
     def set_diameter(self, diameter):
-        diameter_field_id = self.selectedLayer.fields().indexFromName('diameter')
+        if self.isNew:
+            self.selectedFeature['diameter'] = diameter
+        else:
+            diameter_field_id = self.selectedLayer.fields().indexFromName('diameter')
 
-        self.selectedLayer.startEditing()
+            self.selectedLayer.startEditing()
 
-        self.selectedLayer.changeAttributeValue(self.selectedFeature.id(), diameter_field_id, diameter)
+            self.selectedLayer.changeAttributeValue(self.selectedFeature.id(), diameter_field_id, diameter)
 
-        self.selectedLayer.commitChanges()
+            self.selectedLayer.commitChanges()
 
     def set_status(self, status):
-        status_field_id = self.selectedLayer.fields().indexFromName('status')
+        if self.isNew:
+            self.selectedFeature['status'] = status
+        else:
+            status_field_id = self.selectedLayer.fields().indexFromName('status')
 
-        self.selectedLayer.startEditing()
+            self.selectedLayer.startEditing()
 
-        self.selectedLayer.changeAttributeValue(self.selectedFeature.id(), status_field_id, status)
+            self.selectedLayer.changeAttributeValue(self.selectedFeature.id(), status_field_id, status)
 
-        self.selectedLayer.commitChanges()
+            self.selectedLayer.commitChanges()

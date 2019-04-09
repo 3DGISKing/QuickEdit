@@ -65,6 +65,7 @@ class TreeTypeDialogEx(QtWidgets.QDialog):
 
         self.selectedLayer = None
         self.selectedFeature = None
+        self.isNew = None
 
     # noinspection PyPep8Naming
     def onCancelClicked(self):
@@ -77,13 +78,16 @@ class TreeTypeDialogEx(QtWidgets.QDialog):
         self.confirm.emit(self.selectedLayer, self.selectedFeature)
 
     def set_tree_type(self, tree_type):
-        tree_type_field_id = self.selectedLayer.fields().indexFromName('tree_type')
+        if self.isNew:
+            self.selectedFeature['tree_type'] = tree_type
+        else:
+            tree_type_field_id = self.selectedLayer.fields().indexFromName('tree_type')
 
-        self.selectedLayer.startEditing()
+            self.selectedLayer.startEditing()
 
-        self.selectedLayer.changeAttributeValue(self.selectedFeature.id(), tree_type_field_id, tree_type)
+            self.selectedLayer.changeAttributeValue(self.selectedFeature.id(), tree_type_field_id, tree_type)
 
-        self.selectedLayer.commitChanges()
+            self.selectedLayer.commitChanges()
 
     # noinspection PyPep8Naming
     def onPushButtonClicked(self):
